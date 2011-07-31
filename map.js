@@ -115,7 +115,9 @@ function ptToPx(pt) {
   var lonRad = pt.lon * Math.PI / 180;
 
   var x = (lonRad - longOffset) * R;
-  var y = Math.log((Math.sin(latRad) + 1) / Math.cos(latRad)) * R;
+  // Because we draw the points on a canvas, we negate the y position to allow
+  // drawing where the |y| coordinate grows as you move down.
+  var y = -1 * Math.log((Math.sin(latRad) + 1) / Math.cos(latRad)) * R;
 
   return { x: x, y: y };
 }
