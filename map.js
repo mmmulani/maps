@@ -15,6 +15,12 @@ function onLoad() {
       var end = +new Date();
 
       dump("Took ", (end - start), "ms to load data.");
+
+      start = +new Date();
+      testRender();
+      end = +new Date();
+
+      dump("Took ", (end - start), "ms to render map.");
     }
   };
 
@@ -26,7 +32,7 @@ var _data;
 //  lat: float, lon: float
 var nodes = {};
 // ways: hash from id to path object. Each path is of the form:
-//  pts: array of ids, corresponding to nodes.
+//  pts: array of ids, corresponding to nodes, highway: string from OSM data.
 var ways = {};
 
 var bounds = {};
@@ -71,6 +77,8 @@ function init(osmData) {
 }
 
 function extractWay(node) {
+  var toRet = {};
+
   var pts = [];
   for (var i = 0; i < node.childNodes.length; i++) {
     var elem = node.childNodes[i];
@@ -80,9 +88,16 @@ function extractWay(node) {
     if (elem.tagName == "nd") {
       pts.push(elem.getAttribute("ref"));
     }
+    else if (elem.tagName == "tag") {
+      var key = elem.getAttribute("k");
+      if (key == "highway")
+        toRet.highway = elem.getAttribute("v");
+    }
   }
 
-  return { pts: pts };
+  toRet.pts = pts;
+
+  return toRet;
 }
 
 function dump(txt) {
@@ -133,14 +148,18 @@ function getBounds() {
   return { x: x, y: y, width: width, height: height };
 }
 
-function test() {
+function testRender() {
   var bounds = getBounds();
+  context.scale(1, 1);
   context.translate(-1 * bounds.x, -1 * bounds.y);
 
-  var maxWays = 1000;
+  var maxWays = 100000;
   var waysSlice = [];
   var i = 0;
   for (var x in ways) {
+    if (typeof(ways[x].highway) == "undefined")
+      continue;
+
     i++;
     if (i >= maxWays)
       break;
