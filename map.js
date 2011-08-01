@@ -6,16 +6,34 @@ function onCanvasClick(event) {
   if (event.type == "dblclick") {
     zoomInAtPx(coord);
   }
+  else if (event.type == "mousedown") {
+    // This handles the right click case.
+    if (event.which == 3 || event.button == 2) {
+      zoomOutAtPx(coord);
+    }
+  }
+  else {
+    dump(event.type);
+  }
 
   testRender();
 }
 
 function zoomInAtPx(coord) {
+  zoomAtPx(coord, true);
+}
+
+function zoomOutAtPx(coord) {
+  zoomAtPx(coord, false);
+}
+
+function zoomAtPx(coord, zoomIn) {
   var oldScaleX = mapScaleX;
   var oldScaleY = mapScaleY;
 
-  mapScaleX *= 2;
-  mapScaleY *= 2;
+  var ratio = zoomIn ? 2 : (1/2);
+  mapScaleX *= ratio;
+  mapScaleY *= ratio;
 
   var drawWidth = canvas.width / mapScaleX;
   var drawHeight = canvas.height / mapScaleY;
@@ -24,14 +42,15 @@ function zoomInAtPx(coord) {
   mapTranslateY -= (coord.y / oldScaleY) - (drawHeight / 2);
 }
 
-function zoomOutAtPx(coord) {
-}
-
 function onLoad() {
   canvas = document.getElementById("main");
   context = canvas.getContext("2d");
 
+  canvas.addEventListener("mousedown", onCanvasClick);
   canvas.addEventListener("dblclick", onCanvasClick);
+  // Try and prevent a context menu from showing up when the user right clicks
+  // on the canvas.
+  canvas.addEventListener("contextmenu", function(e) { e.preventDefault(); });
 
   var request = new XMLHttpRequest();
   request.open("GET", "map.osm", true);
