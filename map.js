@@ -35,11 +35,8 @@ function zoomAtPx(coord, zoomIn) {
   mapScaleX *= ratio;
   mapScaleY *= ratio;
 
-  var drawWidth = canvas.width / mapScaleX;
-  var drawHeight = canvas.height / mapScaleY;
-
-  mapTranslateX -= (coord.x / oldScaleX) - (drawWidth / 2);
-  mapTranslateY -= (coord.y / oldScaleY) - (drawHeight / 2);
+  mapTranslateX -= (coord.x / oldScaleX) - (coord.x / mapScaleX);
+  mapTranslateY -= (coord.y / oldScaleY) - (coord.y / mapScaleY);
 }
 
 function onLoad() {
