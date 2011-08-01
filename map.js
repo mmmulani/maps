@@ -1,8 +1,37 @@
 var canvas, context;
 
+function onCanvasClick(event) {
+  var coord = getMouseCoordFromEvent(event);
+
+  if (event.type == "dblclick") {
+    zoomInAtPx(coord);
+  }
+
+  testRender();
+}
+
+function zoomInAtPx(coord) {
+  var oldScaleX = mapScaleX;
+  var oldScaleY = mapScaleY;
+
+  mapScaleX *= 2;
+  mapScaleY *= 2;
+
+  var drawWidth = canvas.width / mapScaleX;
+  var drawHeight = canvas.height / mapScaleY;
+
+  mapTranslateX -= (coord.x / oldScaleX) - (drawWidth / 2);
+  mapTranslateY -= (coord.y / oldScaleY) - (drawHeight / 2);
+}
+
+function zoomOutAtPx(coord) {
+}
+
 function onLoad() {
   canvas = document.getElementById("main");
   context = canvas.getContext("2d");
+
+  canvas.addEventListener("dblclick", onCanvasClick);
 
   var request = new XMLHttpRequest();
   request.open("GET", "map.osm", true);
@@ -17,6 +46,7 @@ function onLoad() {
       dump("Took ", (end - start), "ms to load data.");
 
       start = +new Date();
+      setupRenderBounds();
       testRender();
       end = +new Date();
 
@@ -150,10 +180,28 @@ function getBounds() {
   return { x: x, y: y, width: width, height: height };
 }
 
+var mapScaleX;
+var mapScaleY;
+var mapTranslateX;
+var mapTranslateY;
+function setupRenderBounds() {
+  var bounds = getBounds();
+
+  mapScaleX = 1;
+  mapScaleY = 1;
+
+  mapTranslateX = -1 * bounds.x;
+  mapTranslateY = -1 * bounds.y;
+}
+
 function testRender() {
   var bounds = getBounds();
-  context.scale(1, 1);
-  context.translate(-1 * bounds.x, -1 * bounds.y);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  context.save();
+
+  context.scale(mapScaleX, mapScaleY);
+  context.translate(mapTranslateX, mapTranslateY);
 
   var maxWays = 100000;
   var waysSlice = [];
@@ -172,6 +220,31 @@ function testRender() {
   for (var i = 0; i < waysSlice.length; i++) {
     drawWay(waysSlice[i]);
   }
+
+  context.restore();
+}
+
+function getMouseCoordFromEvent(event) {
+  var x = 0;
+  var y = 0;
+
+  // Fffff Firefox.
+  if (typeof(event.offsetX) == "undefined") {
+    var element = event.target;
+    do {
+      x += element.offsetLeft;
+      y += element.offsetTop;
+    } while (element = element.offsetParent);
+
+    x = (window.pageXOffset + event.clientX) - x;
+    y = (window.pageYOffset + event.clientY) - y;
+  }
+  else {
+    x = event.offsetX;
+    y = event.offsetY;
+  }
+
+  return { x: x, y: y };
 }
 
 window.onload = onLoad;
