@@ -56,7 +56,7 @@ function onLoad() {
   request.onreadystatechange = function(evt) {
     if ((request.readyState == 4) && (request.status == 200)) {
       var start = +new Date();
-      init(request.responseXML);
+      parseXML(request.responseXML);
       var end = +new Date();
 
       dump("Took ", (end - start), "ms to load data.");
@@ -73,6 +73,25 @@ function onLoad() {
   request.send(null);
 }
 
+function getDataForBounds(bounds) {
+  var str = JSON.stringify({ bbox: bounds });
+
+  var request = new XMLHttpRequest();
+  request.open("POST", "bbox", true);
+  request.setRequestHeader("Content-type", "application/json");
+  request.setRequestHeader("Content-length", str.length);
+
+  request.onreadystatechange = function(evt) {
+    if ((request.readyState == 4) && (request.status == 200)) {
+      var data = JSON.parse(request.responseText);
+      nodes = data.nodes;
+      ways = data.ways;
+    }
+  };
+
+  request.send(str);
+}
+
 var _data;
 // nodes: hash from id to point object. Each point is of the form:
 //  lat: float, lon: float
@@ -85,7 +104,7 @@ var bounds = {};
 // bounds: object of the form:
 //   minlat: float, maxlat: float, minlon: float, maxlon: float
 
-function init(osmData) {
+function parseXML(osmData) {
   _data = osmData;
   var data = osmData.firstChild.childNodes;
   for (var i = 0; i < data.length; i++) {
@@ -154,6 +173,8 @@ function dump(txt) {
 // ptToPx: converts a point object (lat, long) to a pixel object (x, y) using
 //   a Mercator projection.
 function ptToPx(pt) {
+  // XXX: Move these constants somewhere else to avoid repeated code for
+  // |pxToPt|.
   var R = Math.pow(2, 13) * 256;
   var longOffset = 0;
 
@@ -168,9 +189,37 @@ function ptToPx(pt) {
   return { x: x, y: y };
 }
 
+// pxToPt: converts a pixel object to a point object using a Mercator
+//   projection. This should be the inverse of |ptToPx|.
+function pxToPt(px) {
+  var R = Math.pow(2, 13) * 256;
+  var longOffset = 0;
+
+  // Just like in |ptToPx|, we must invert the y position to account for drawing
+  // on a canvas.
+  var y = -1 * px.y;
+
+  var latRad = 2 * Math.atan(Math.exp(y / R)) - (Math.PI / 2);
+  var lonRad = px.x / R + longOffset;
+
+  var lat = latRad * 180 / Math.PI;
+  var lon = lonRad * 180 / Math.PI;
+
+  return { lat: lat, lon: lon };
+}
+
 function drawWay(way) {
   context.beginPath();
+
   var pts = way.pts.map(function(x) { return nodes[x]; });
+
+  // Sanity check: make sure that we have data on all the points in the path.
+  for (var i = 0; i < pts.length; i++) {
+    if (typeof(pts[i]) == "undefined") {
+      dump("Missing data on ", way.pts[i]);
+      return;
+    }
+  }
 
   var firstPx = ptToPx(pts[0]);
   context.moveTo(firstPx.x, firstPx.y);

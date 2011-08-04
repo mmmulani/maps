@@ -4,20 +4,43 @@ var connect = require('connect');
 
 var conString = 'tcp://postgres:sergtsop@localhost/gis';
 
-function getLines(bbox) {
-  var bboxQuery = bbox.map(function(x) { return x.lat + " " + x.lon; }).join(", ");
+function getLines(bbox, cb) {
+  var bboxQuery = bbox.map(function(x) { return x.lon + " " + x.lat; })
+                      .join(", ");
   pg.connect(conString, function(err, client) {
-    console.log(err);
-    client.query({
-      text: "SELECT w.id, w.nodes, w.tags " +
-            "FROM planet_osm_line l, planet_osm_ways w " +
-            "WHERE l.way && ST_Transform(ST_GeomFromText('POLYGON(($1))',4326), 900913) " +
-              "AND l.osm_id = w.id",
-      values: [bboxQuery],
-    },
+    client.query("SELECT w.id, w.nodes, w.tags " +
+                 "FROM planet_osm_line l, planet_osm_ways w " +
+                 "WHERE l.way && ST_Transform(ST_GeomFromText('POLYGON((" +
+                    bboxQuery + "))',4326), 900913) " +
+                   "AND l.osm_id = w.id",
     function(err, result) {
-      console.log("in query");
-      console.log("row count: %d", result.rows.length);
+      var ways = {};
+      for (var i = 0; i < result.rows.length; i++) {
+        var row =  result.rows[i];
+        if (row.tags.indexOf("highway") == -1)
+          continue;
+
+        var id = row.id;
+        ways[id] = { pts: row.nodes,
+                     highway: row.tags[row.tags.indexOf("highway") + 1] };
+      }
+
+      client.query("SELECT n.id, n.tags, ST_X(ST_Transform(ST_SetSRID(ST_Point(n.lon::float / 100, n.lat::float / 100), 900913), 4326)), ST_Y(ST_Transform(ST_SetSRID(ST_Point(n.lon::float / 100, n.lat::float / 100), 900913), 4326)) " +
+                   "FROM planet_osm_line l, planet_osm_ways w, planet_osm_nodes n " +
+                   "WHERE l.way && ST_Transform(ST_GeomFromText('POLYGON((" +
+                      bboxQuery + "))',4326), 900913) " +
+                      "AND l.osm_id = w.id AND n.id = ANY(w.nodes)",
+      function(err, result) {
+        console.log(err);
+        var nodes = {};
+        for (var i = 0; i < result.rows.length; i++) {
+          var row = result.rows[i];
+
+          nodes[row.id] = { lat: row.st_y, lon: row.st_x };
+        }
+
+        cb({ ways: ways, nodes: nodes });
+      });
     });
   });
 }
@@ -27,9 +50,18 @@ var server = connect(
   connect.bodyParser(),
   connect.router(function(app) {
     app.post('/bbox', function(req, res) {
-      var box = req.body.bbox;
-      console.log('got request for ', box);
-      res.ok().json({ test: 1 });
+      var bbox = req.body.bbox;
+      var box = [
+        { lat: bbox.minlat, lon: bbox.minlon },
+        { lat: bbox.minlat, lon: bbox.maxlon },
+        { lat: bbox.maxlat, lon: bbox.maxlon },
+        { lat: bbox.maxlat, lon: bbox.minlon },
+        { lat: bbox.minlat, lon: bbox.minlon }
+      ];
+      var cb = function(data) {
+        res.ok().json(data);
+      }
+      getLines(box, cb);
     });
   }),
   connect.static('/home/mmmulani/osm/webfeed/')
