@@ -31,7 +31,8 @@ var server = connect(
       console.log('got request for ', box);
       res.ok().json({ test: 1 });
     });
-  })
+  }),
+  connect.static('/home/mmmulani/osm/webfeed/')
 );
 
 server.listen(8000);
