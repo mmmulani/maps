@@ -1,5 +1,7 @@
 var canvas, context;
 
+var _dragging = false;
+var _startingCoord = {};
 function onCanvasClick(event) {
   var coord = getMouseCoordFromEvent(event);
 
@@ -10,6 +12,21 @@ function onCanvasClick(event) {
     // This handles the right click case.
     if (event.which == 3 || event.button == 2) {
       zoomOutAtPx(coord);
+    }
+    else {
+      _dragging = true;
+      _startingCoord = coord;
+    }
+  }
+  else if (event.type == "mouseup") {
+    if (_dragging) {
+      _dragging = false;
+
+      if ((Math.abs(coord.x - _startingCoord.x) > 5) &&
+          (Math.abs(coord.y - _startingCoord.y) > 5)) {
+        panMap({ x: coord.x - _startingCoord.x,
+                 y: coord.y - _startingCoord.y });
+      }
     }
   }
   else {
@@ -39,11 +56,24 @@ function zoomAtPx(coord, zoomIn) {
   mapTranslateY -= (coord.y / oldScaleY) - (coord.y / mapScaleY);
 }
 
+function panMap(coord) {
+  var bounds = getBounds();
+
+  bounds.x -= coord.x;
+  bounds.y -= coord.y;
+
+  setBounds(bounds);
+  setupRenderBounds();
+
+  getDataForBounds(window.bounds);
+}
+
 function onLoad() {
   canvas = document.getElementById("main");
   context = canvas.getContext("2d");
 
   canvas.addEventListener("mousedown", onCanvasClick);
+  canvas.addEventListener("mouseup", onCanvasClick);
   canvas.addEventListener("dblclick", onCanvasClick);
   // Try and prevent a context menu from showing up when the user right clicks
   // on the canvas.
@@ -61,12 +91,8 @@ function onLoad() {
 
       dump("Took ", (end - start), "ms to load data.");
 
-      start = +new Date();
       setupRenderBounds();
       testRender();
-      end = +new Date();
-
-      dump("Took ", (end - start), "ms to render map.");
     }
   };
 
@@ -83,9 +109,16 @@ function getDataForBounds(bounds) {
 
   request.onreadystatechange = function(evt) {
     if ((request.readyState == 4) && (request.status == 200)) {
+      var start = +new Date();
       var data = JSON.parse(request.responseText);
+      var end = +new Date();
+
+      dump ("Took ", (end - start), "ms to load data from JSON.");
+
       nodes = data.nodes;
       ways = data.ways;
+
+      testRender();
     }
   };
 
@@ -245,21 +278,38 @@ function getBounds() {
   return { x: x, y: y, width: width, height: height };
 }
 
-var mapScaleX;
-var mapScaleY;
+function setBounds(aBounds) {
+  var p1 = pxToPt({ x: aBounds.x, y: aBounds.y });
+  var p2 = pxToPt({ x: aBounds.x + aBounds.width,
+                    y: aBounds.y + aBounds.height });
+
+  var minLat = Math.min(p1.lat, p2.lat);
+  var minLon = Math.min(p1.lon, p2.lon);
+
+  var maxLat = Math.max(p1.lat, p2.lat);
+  var maxLon = Math.max(p1.lon, p2.lon);
+
+  bounds.minlat = minLat;
+  bounds.minlon = minLon;
+
+  bounds.maxlat = maxLat;
+  bounds.maxlon = maxLon;
+}
+
+var mapScaleX = 1;
+var mapScaleY = 1;
 var mapTranslateX;
 var mapTranslateY;
 function setupRenderBounds() {
   var bounds = getBounds();
-
-  mapScaleX = 1;
-  mapScaleY = 1;
 
   mapTranslateX = -1 * bounds.x;
   mapTranslateY = -1 * bounds.y;
 }
 
 function testRender() {
+  var start = +new Date();
+
   var bounds = getBounds();
   context.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -287,6 +337,9 @@ function testRender() {
   }
 
   context.restore();
+
+  var end = +new Date();
+  dump("Took ", (end - start), "ms to render map.");
 }
 
 function getMouseCoordFromEvent(event) {
