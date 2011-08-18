@@ -48,12 +48,17 @@ function zoomAtPx(coord, zoomIn) {
   var oldScaleX = mapScaleX;
   var oldScaleY = mapScaleY;
 
-  var ratio = zoomIn ? 2 : (1/2);
-  mapScaleX *= ratio;
-  mapScaleY *= ratio;
+  var translateRatio = zoomIn ? (1/2) : -1;
+  var scaleRatio = zoomIn ? (1/2) : 2;
+  var bounds = getBounds();
 
-  mapTranslateX -= (coord.x / oldScaleX) - (coord.x / mapScaleX);
-  mapTranslateY -= (coord.y / oldScaleY) - (coord.y / mapScaleY);
+  bounds.x += (coord.x * translateRatio);
+  bounds.y += (coord.y * translateRatio);
+
+  bounds.width *= Math.abs(scaleRatio);
+  bounds.height *= Math.abs(scaleRatio);
+
+  setBounds(bounds);
 }
 
 function panMap(coord) {
@@ -63,9 +68,9 @@ function panMap(coord) {
   bounds.y -= coord.y;
 
   setBounds(bounds);
-  setupRenderBounds();
 
-  getDataForBounds(window.bounds);
+  // XXX: Disabled grabbing new data while the server is down.
+  //getDataForBounds(window.bounds);
 }
 
 function onLoad() {
@@ -91,7 +96,6 @@ function onLoad() {
 
       dump("Took ", (end - start), "ms to load data.");
 
-      setupRenderBounds();
       testRender();
     }
   };
@@ -203,12 +207,33 @@ function dump(txt) {
   console.textContent += (arguments.length > 1 ? Array.prototype.join.call(arguments, "") : txt) + "\n";
 }
 
+// zoomFactor: Factor used when converting points to pixels and vice-versa.
+// It is rooted in Google Maps' zoom factor.
+var zoomFactor = 4;
+function calculateZoomFactor() {
+  // In order to calculate the zoom factor, we scale from where the bounds
+  // would be mapped to with a zoom factor of 1.
+  var minPx = ptToPx({ lon: bounds.minlon, lat: bounds.minlat }, true);
+  var maxPx = ptToPx({ lon: bounds.maxlon, lat: bounds.maxlon }, true);
+
+  var xDiff = Math.abs(maxPx.x - minPx.x);
+  var yDiff = Math.abs(maxPx.y - minPx.y);
+
+  var xScale = Math.floor(Math.log((canvas.width / xDiff) / 256) / Math.log(2));
+  var yScale = Math.floor(Math.log((canvas.height / yDiff) / 256) / Math.log(2));
+
+  // Usually we would take the minimum of |xScale| and |yScale| so that we show
+  // as much data as possible. Sadly our data is usually skewed towards having
+  // too much content, so we take the maximum.
+  zoomFactor = Math.max(xScale, yScale);
+}
+
 // ptToPx: converts a point object (lat, long) to a pixel object (x, y) using
-//   a Mercator projection.
-function ptToPx(pt) {
-  // XXX: Move these constants somewhere else to avoid repeated code for
-  // |pxToPt|.
-  var R = Math.pow(2, 13) * 256;
+//   a Mercator projection. The second parameter, |dontScale|, specifies whether
+//   to apply any sort of scale. (It is usually true when we want to determine
+//   what scale to provide for a set of points.)
+function ptToPx(pt, dontScale) {
+  var R = dontScale ? 1 : Math.pow(2, zoomFactor) * 256;
   var longOffset = 0;
 
   var latRad = pt.lat * Math.PI / 180;
@@ -225,7 +250,7 @@ function ptToPx(pt) {
 // pxToPt: converts a pixel object to a point object using a Mercator
 //   projection. This should be the inverse of |ptToPx|.
 function pxToPt(px) {
-  var R = Math.pow(2, 13) * 256;
+  var R = Math.pow(2, zoomFactor) * 256;
   var longOffset = 0;
 
   // Just like in |ptToPx|, we must invert the y position to account for drawing
@@ -301,6 +326,8 @@ var mapScaleY = 1;
 var mapTranslateX;
 var mapTranslateY;
 function setupRenderBounds() {
+  calculateZoomFactor();
+
   var bounds = getBounds();
 
   mapTranslateX = -1 * bounds.x;
@@ -308,6 +335,8 @@ function setupRenderBounds() {
 }
 
 function testRender() {
+  setupRenderBounds();
+
   var start = +new Date();
 
   var bounds = getBounds();
