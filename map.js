@@ -4,6 +4,8 @@ var _dragging = false;
 var _startingCoord = {};
 function onCanvasClick(event) {
   var coord = getMouseCoordFromEvent(event);
+  var canvasCoord = { x: coord.x + (canvas.width / 3),
+                      y: coord.y + (canvas.height /3 ) };
   var dontDraw = false;
 
   if (event.type != "mousemove") {
@@ -12,12 +14,12 @@ function onCanvasClick(event) {
   }
 
   if (event.type == "dblclick") {
-    zoomInAtPx(coord);
+    zoomInAtPx(canvasCoord);
   }
   else if (event.type == "mousedown") {
     // This handles the right click case.
     if (event.which == 3 || event.button == 2) {
-      zoomOutAtPx(coord);
+      zoomOutAtPx(canvasCoord);
     }
     else {
       _dragging = true;
