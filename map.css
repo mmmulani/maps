@@ -1,0 +1,11 @@
+#clipbox {
+  width: 500px;
+  height: 500px;
+  overflow: hidden;
+}
+
+#main {
+  /*-webkit-transform: translate(-200px, -100px);
+  -moz-transform: translate(-200px, -100px);*/
+  position: relative;
+}

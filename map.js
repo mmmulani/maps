@@ -4,6 +4,12 @@ var _dragging = false;
 var _startingCoord = {};
 function onCanvasClick(event) {
   var coord = getMouseCoordFromEvent(event);
+  var dontDraw = false;
+
+  if (event.type != "mousemove") {
+    dump("onCanvasClick: type: ", event.type, " coord: ", coord.x, ", ",
+         coord.y);
+  }
 
   if (event.type == "dblclick") {
     zoomInAtPx(coord);
@@ -16,6 +22,8 @@ function onCanvasClick(event) {
     else {
       _dragging = true;
       _startingCoord = coord;
+
+      dontDraw = true;
     }
   }
   else if (event.type == "mouseup") {
@@ -26,14 +34,45 @@ function onCanvasClick(event) {
           (Math.abs(coord.y - _startingCoord.y) > 5)) {
         panMap({ x: coord.x - _startingCoord.x,
                  y: coord.y - _startingCoord.y });
+
+        centerCanvas();
       }
     }
+  }
+  else if (event.type == "mousemove") {
+    if (_dragging) {
+      var diffX = coord.x - _startingCoord.x;
+      var diffY = coord.y - _startingCoord.y;
+
+      if ((Math.abs(diffX) > 5) && (Math.abs(diffY) > 5)) {
+        diffX += canvas.width / -3;
+        diffY += canvas.height / -3;
+        translateCanvas(diffX, diffY);
+      }
+    }
+
+    dontDraw = true;
   }
   else {
     dump(event.type);
   }
 
-  testRender();
+  if (!dontDraw)
+    testRender();
+}
+
+function translateCanvas(translateX, translateY) {
+  var translateStr = "translate(" + translateX + "px, " + translateY + "px)";
+
+  canvas.style.webkitTransform = translateStr;
+  canvas.style.MozTransform = translateStr;
+}
+
+function centerCanvas() {
+  var translateX = canvas.width / -3;
+  var translateY = canvas.height / -3;
+
+  translateCanvas(translateX, translateY);
 }
 
 function zoomInAtPx(coord) {
@@ -79,10 +118,13 @@ function onLoad() {
 
   canvas.addEventListener("mousedown", onCanvasClick);
   canvas.addEventListener("mouseup", onCanvasClick);
+  canvas.addEventListener("mousemove", onCanvasClick);
   canvas.addEventListener("dblclick", onCanvasClick);
   // Try and prevent a context menu from showing up when the user right clicks
   // on the canvas.
   canvas.addEventListener("contextmenu", function(e) { e.preventDefault(); });
+
+  centerCanvas();
 
   var request = new XMLHttpRequest();
   request.open("GET", "map.osm", true);
@@ -375,21 +417,18 @@ function getMouseCoordFromEvent(event) {
   var x = 0;
   var y = 0;
 
-  // Fffff Firefox.
-  if (typeof(event.offsetX) == "undefined") {
-    var element = event.target;
-    do {
-      x += element.offsetLeft;
-      y += element.offsetTop;
-    } while (element = element.offsetParent);
+  // We purposely calculate the |event.offsetX/Y|-like values because they do
+  // not take CSS transforms into account, which are useful if the transform
+  // is changed during the mouse event. (e.g. if the transform is changed on
+  // mousedown.)
+  var element = event.target;
+  do {
+    x += element.offsetLeft;
+    y += element.offsetTop;
+  } while (element = element.offsetParent);
 
-    x = (window.pageXOffset + event.clientX) - x;
-    y = (window.pageYOffset + event.clientY) - y;
-  }
-  else {
-    x = event.offsetX;
-    y = event.offsetY;
-  }
+  x = (window.pageXOffset + event.clientX) - x;
+  y = (window.pageYOffset + event.clientY) - y;
 
   return { x: x, y: y };
 }
