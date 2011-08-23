@@ -8,11 +8,6 @@ function onCanvasClick(event) {
                       y: coord.y + (canvas.height /3 ) };
   var dontDraw = false;
 
-  if (event.type != "mousemove") {
-    dump("onCanvasClick: type: ", event.type, " coord: ", coord.x, ", ",
-         coord.y);
-  }
-
   if (event.type == "dblclick") {
     zoomInAtPx(canvasCoord);
   }
@@ -32,13 +27,10 @@ function onCanvasClick(event) {
     if (_dragging) {
       _dragging = false;
 
-      if ((Math.abs(coord.x - _startingCoord.x) > 5) &&
-          (Math.abs(coord.y - _startingCoord.y) > 5)) {
-        panMap({ x: coord.x - _startingCoord.x,
-                 y: coord.y - _startingCoord.y });
+      panMap({ x: coord.x - _startingCoord.x,
+               y: coord.y - _startingCoord.y });
 
-        centerCanvas();
-      }
+      centerCanvas();
     }
   }
   else if (event.type == "mousemove") {
@@ -46,11 +38,9 @@ function onCanvasClick(event) {
       var diffX = coord.x - _startingCoord.x;
       var diffY = coord.y - _startingCoord.y;
 
-      if ((Math.abs(diffX) > 5) && (Math.abs(diffY) > 5)) {
-        diffX += canvas.width / -3;
-        diffY += canvas.height / -3;
-        translateCanvas(diffX, diffY);
-      }
+      diffX += canvas.width / -3;
+      diffY += canvas.height / -3;
+      translateCanvas(diffX, diffY);
     }
 
     dontDraw = true;
@@ -141,6 +131,18 @@ function onLoad() {
       dump("Took ", (end - start), "ms to load data.");
 
       testRender();
+
+      // We handle this data specifically by moving the map to a "desirable"
+      // viewing position.
+      panMap({ x: 200, y: 400 });
+
+      testRender();
+    }
+  };
+
+  request.onprogress = function(evt) {
+    if (evt.lengthComputable) {
+      drawProgress(evt.loaded / evt.total);
     }
   };
 
@@ -376,6 +378,15 @@ function setupRenderBounds() {
 
   mapTranslateX = -1 * bounds.x;
   mapTranslateY = -1 * bounds.y;
+}
+
+function drawProgress(percent) {
+  var percentTxt = Math.floor(percent * 100);
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  context.font = "16px sans-serif";
+  context.fillText(percentTxt + "% loaded..", canvas.width / 2 - 50, canvas.height / 2);
 }
 
 function testRender() {

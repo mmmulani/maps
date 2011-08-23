@@ -2,10 +2,15 @@
   width: 500px;
   height: 500px;
   overflow: hidden;
+
+  border: 1px solid black;
 }
 
 #main {
-  /*-webkit-transform: translate(-200px, -100px);
-  -moz-transform: translate(-200px, -100px);*/
+  /* We use transforms to move the map within the clip box while panning.
+     They look like this:
+    -webkit-transform: translate(-500px, -500px);
+    -moz-transform: translate(-500px, -500px);
+  */
   position: relative;
 }
